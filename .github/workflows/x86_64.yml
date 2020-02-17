@@ -1,0 +1,144 @@
+name: Build OpenWrt x86_64
+
+on:
+  push:
+    branches: 
+      - x86_64
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    
+    steps:
+    - name: Clone Repository
+      uses: actions/checkout@v2
+      with:
+        ref: 'x86_64'
+        fetch-depth: '1'
+    - name: Init Build Dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        docker rmi $(docker images -q)
+        sudo -E apt-get remove -y --purge azure-cli ghc zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php*
+        sudo -E apt-get update -y
+        #sudo -E apt-get full-upgrade -y
+        sudo -E apt-get install -y build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-8 gcc++-8 gcc-8-multilib g++-8-multilib p7zip p7zip-full msmtp libssl-dev texinfo libreadline-dev libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint ccache curl wget vim nano python python3 python-pip python3-pip python-ply python3-ply haveged lrzsz device-tree-compiler
+        sudo -E ln -sf /usr/bin/gcc-8 /usr/bin/gcc
+        sudo -E ln -sf /usr/bin/g++-8 /usr/bin/g++
+        sudo -E ln -sf /usr/bin/gcc-ar-8 /usr/bin/gcc-ar
+        sudo -E ln -sf /usr/bin/gcc-nm-8 /usr/bin/gcc-nm
+        sudo -E ln -sf /usr/bin/gcc-ranlib-8 /usr/bin/gcc-ranlib
+        sudo -E apt-get autoremove -y --purge
+        sudo -E apt-get clean -y
+        sudo -E rm -rf /usr/share/dotnet /etc/mysql /etc/php
+    - name: Init OpenWrt Environment
+      run: |
+        cd /home/runner
+        git clone --branch master --depth 1 https://github.com/project-openwrt/openwrt.git
+        sudo chown -R runner:runner openwrt
+        cd /home/runner/openwrt
+        ./scripts/feeds update -a 
+        ./scripts/feeds install -a
+        cp -fpR /home/runner/work/The-Compiled-OpenWrt-Firmwares/The-Compiled-OpenWrt-Firmwares/. /home/runner/openwrt/
+    - name: Build Firmware
+      run: | 
+        cd /home/runner/openwrt
+        let make_process=$(nproc)+1
+        make defconfig
+        make -j${make_process} || { make tools/compile -j1; make -j${make_process} || rm -rf /home/runner/openwrt/dl; make target/install; make package/index; make checksum;  }
+    - name: Upload Config
+      uses: actions/upload-artifact@v1
+      with:
+        name: config.seed
+        path: /home/runner/openwrt/bin/targets/x86/64/config.seed
+    - name: Upload Kernel Config
+      uses: actions/upload-artifact@v1
+      with:
+        name: config-4.19
+        path: /home/runner/openwrt/target/linux/x86/config-4.19
+    - name: Upload Packages
+      uses: actions/upload-artifact@v1
+      with:
+        name: Packages
+        path: /home/runner/openwrt/bin/packages/x86_64/
+    - name: Upload Packages Info
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-generic.manifest
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-generic.manifest
+    - name: Upload Kernel Packages
+      uses: actions/upload-artifact@v1
+      with:
+        name: Kernel Packages
+        path: /home/runner/openwrt//bin/targets/x86/64/packages/
+    - name: Upload Generic RootFS Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-generic-rootfs.tar.gz
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-generic-rootfs.tar.gz
+    - name: Upload Generic SquashFS Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-rootfs-squashfs.img
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-rootfs-squashfs.img
+    - name: Upload Combined DVD Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-combined-squashfs.img
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-combined-squashfs.img
+    - name: Upload Combined PVE/KVM Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-combined-squashfs.qcow2
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-combined-squashfs.qcow2
+    - name: Upload Combined VirtualBox Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-combined-squashfs.vdi
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-combined-squashfs.vdi
+    - name: Upload Combined VMware Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-combined-squashfs.vmdk
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-combined-squashfs.vmdk
+    - name: Upload Combined VMware-EXSI Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-combined-squashfs-esxi-flat.vmdk
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-combined-squashfs-esxi-flat.vmdk
+    - name: Upload Combined Hyper-V Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-combined-squashfs.vhdx
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-combined-squashfs.vhdx
+
+    - name: Upload GPT DVD Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-uefi-gpt-squashfs.img
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-uefi-gpt-squashfs.img
+    - name: Upload GPT PVE/KVM Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-uefi-gpt-squashfs.qcow2
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-uefi-gpt-squashfs.qcow2
+    - name: Upload GPT VirtualBox Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-uefi-gpt-squashfs.vdi
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-uefi-gpt-squashfs.vdi
+    - name: Upload GPT VMware Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-uefi-gpt-squashfs.vmdk
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-uefi-gpt-squashfs.vmdk
+    - name: Upload GPT Hyper-V Image
+      uses: actions/upload-artifact@v1
+      with:
+        name: openwrt-x86-64-uefi-gpt-squashfs.vhdx
+        path: /home/runner/openwrt/bin/targets/x86/64/openwrt-x86-64-uefi-gpt-squashfs.vhdx
+    - name: Upload Images SHA256SUMS
+      uses: actions/upload-artifact@v1
+      with:
+        name: sha256sums
+        path: /home/runner/openwrt/bin/targets/x86/64/sha256sums
